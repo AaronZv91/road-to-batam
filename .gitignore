@@ -1,0 +1,21 @@
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependency directories
+node_modules/
+
+# Local env files (IMPORTANT: This keeps your keys private)
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+.DS_Store

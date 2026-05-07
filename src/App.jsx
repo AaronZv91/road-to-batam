@@ -8,10 +8,9 @@ import {
   Milestone,
   Medal
 } from "lucide-react";
-import { createStorage, syncStateSnapshot } from "./lib/storage";
+import { getMembers, addMember, logSwim, subscribeToTeamRealtime } from "./lib/storage";
 import OSMExpeditionMap from "./components/OSMExpeditionMap";
 
-const storage = createStorage();
 const GOAL_KM = 500;
 const ACTIVE_WINDOW_MS = 48 * 60 * 60 * 1000;
 const STAGES = [
@@ -81,18 +80,45 @@ function TeamCircle({ swimmers }) {
 }
 
 export default function App() {
-  const [state, setState] = useState(() => storage.loadState());
-  const [selectedId, setSelectedId] = useState(() => state.team[0]?.id ?? "");
+  const [state, setState] = useState({ team: [], logs: [] });
+  const [selectedId, setSelectedId] = useState("");
   const [meters, setMeters] = useState("");
   const [joinName, setJoinName] = useState("");
   const [splashKey, setSplashKey] = useState(0);
   const [podBoost, setPodBoost] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [days, setDays] = useState(() => getDaysToGames());
 
+  function toUiMember(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      totalKm: Number(((row.total_meters ?? 0) / 1000).toFixed(2)),
+      lastLoggedAt: row.last_active ? new Date(row.last_active).getTime() : 0
+    };
+  }
+
+  async function refreshMembers() {
+    const rows = await getMembers();
+    const members = rows.map(toUiMember);
+    setState((prev) => ({ ...prev, team: members }));
+    setSelectedId((prev) => prev || members[0]?.id || "");
+  }
+
   useEffect(() => {
-    storage.saveState(state);
-  }, [state]);
+    refreshMembers().catch((error) => {
+      console.error("Failed to load members:", error);
+    });
+
+    const channel = subscribeToTeamRealtime(() => {
+      refreshMembers().catch((error) => {
+        console.error("Realtime refresh failed:", error);
+      });
+    });
+
+    return () => {
+      if (channel?.unsubscribe) channel.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const refresh = () => setDays(getDaysToGames());
@@ -108,57 +134,27 @@ export default function App() {
   const totalKm = useMemo(() => state.team.reduce((acc, n) => acc + n.totalKm, 0), [state.team]);
   const activeStage = getStage(totalKm);
 
-  function logSwim(e) {
+  async function handleLogSwim(e) {
     e.preventDefault();
     const metersValue = Number(meters);
     if (!selectedId || !metersValue || metersValue <= 0) return;
-    const km = metersValue / 1000;
-    const now = Date.now();
-
-    setState((prev) => ({
-      ...prev,
-      team: prev.team.map((member) =>
-        member.id === selectedId
-          ? { ...member, totalKm: Number((member.totalKm + km).toFixed(2)), lastLoggedAt: now }
-          : member
-      ),
-      logs: [{ id: crypto.randomUUID(), swimmerId: selectedId, km, createdAt: now }, ...prev.logs]
-    }));
+    await logSwim(selectedId, metersValue);
+    await refreshMembers();
 
     setMeters("");
     setSplashKey((k) => k + 1);
     setPodBoost((k) => k + 1);
   }
 
-  function joinMission() {
+  async function joinMission() {
     const trimmed = joinName.trim();
     if (!trimmed) return;
-    setState((prev) => {
-      const exists = prev.team.some((m) => m.name.toLowerCase() === trimmed.toLowerCase());
-      if (exists) return prev;
-      return {
-        ...prev,
-        team: [
-          ...prev.team,
-          {
-            id: `swimmer-${crypto.randomUUID()}`,
-            name: trimmed,
-            totalKm: 0,
-            lastLoggedAt: 0
-          }
-        ]
-      };
-    });
+    const exists = state.team.some((m) => m.name.toLowerCase() === trimmed.toLowerCase());
+    if (exists) return;
+    const created = await addMember(trimmed);
+    await refreshMembers();
+    if (created) setSelectedId(created.id);
     setJoinName("");
-  }
-
-  async function syncDemo() {
-    setIsSyncing(true);
-    try {
-      await syncStateSnapshot(state);
-    } finally {
-      setIsSyncing(false);
-    }
   }
 
   const badgeThemes = [
@@ -202,7 +198,7 @@ export default function App() {
               <Waves size={18} />
               <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Log Distance</h2>
             </div>
-            <form onSubmit={logSwim} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <form onSubmit={handleLogSwim} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
               <select
                 value={selectedId}
                 onChange={(e) => setSelectedId(e.target.value)}
@@ -231,7 +227,7 @@ export default function App() {
               </motion.button>
             </form>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
               <input
                 value={joinName}
                 onChange={(e) => setJoinName(e.target.value)}
@@ -244,12 +240,10 @@ export default function App() {
               >
                 <UserPlus size={15} /> Join the Mission
               </button>
-              <button
-                onClick={syncDemo}
-                className="rounded-xl border border-cyan-300/60 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100 transition hover:bg-cyan-500/20"
-              >
-                {isSyncing ? "Syncing..." : "Sync Snapshot"}
-              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-cyan-200/80">
+              <span>0m</span>
+              <span>500000m</span>
             </div>
 
             <AnimatePresence mode="wait" initial={false}>
@@ -263,7 +257,7 @@ export default function App() {
               >
                 <motion.div
                   initial={{ width: "0%" }}
-                  animate={{ width: `${Math.min((totalKm / GOAL_KM) * 100, 100)}%` }}
+                  animate={{ width: `${Math.min((totalKm * 1000 / 500000) * 100, 100)}%` }}
                   className="h-full bg-neon"
                 />
               </motion.div>
