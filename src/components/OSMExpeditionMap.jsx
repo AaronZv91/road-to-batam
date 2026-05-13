@@ -136,9 +136,10 @@ export default function OSMExpeditionMap({ progressKm, goalKm, stageLabel, boost
     () =>
       L.divIcon({
         className: "shark-emoji-marker",
-        html: '<div style="font-size:24px; line-height:24px; filter: drop-shadow(0 0 4px rgba(56,189,248,0.9));">🦈</div>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        html:
+          '<div style="font-size:31px;line-height:31px;filter:drop-shadow(0 0 10px #22d3ee) drop-shadow(0 0 6px #a5f3fc) saturate(1.35) contrast(1.1);">🦈</div>',
+        iconSize: [31, 31],
+        iconAnchor: [16, 16],
       }),
     []
   );

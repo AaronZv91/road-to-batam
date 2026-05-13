@@ -52,3 +52,14 @@ body {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #166534;
 }
+
+/* Leaflet map tiles/panes use high z-index; keep map below app modals (z-[10000]) */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+/* Leaflet custom marker: no white box behind emoji */
+.shark-emoji-marker {
+  background: transparent !important;
+  border: none !important;
+}
