@@ -539,8 +539,8 @@ export default function App() {
                 <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Lead Shark</h2>
               </div>
             </div>
-            <div className="space-y-2">
-              {sorted.slice(0, 6).map((swimmer, idx) => (
+            <div className="leaderboard-scroll space-y-2">
+              {sorted.map((swimmer, idx) => (
                 <div
                   key={swimmer.id}
                   className="flex items-center justify-between rounded-xl border border-cyan-300/30 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
@@ -569,8 +569,8 @@ export default function App() {
             {free50Board.length === 0 ? (
               <p className="text-xs text-slate-400">No 50m freestyle times yet.</p>
             ) : (
-              <ul className="space-y-1.5 text-sm">
-                {free50Board.slice(0, 6).map((row, i) => (
+              <ul className="leaderboard-scroll space-y-1.5 text-sm">
+                {free50Board.map((row, i) => (
                   <li key={`${row.swimmer_id}-${i}`} className="flex justify-between rounded-lg border border-cyan-300/20 bg-slate-900/50 px-2 py-1.5">
                     <span className="text-cyan-200">
                       {i + 1}.{" "}
@@ -596,8 +596,8 @@ export default function App() {
             {breast50Board.length === 0 ? (
               <p className="text-xs text-slate-400">No 50m breaststroke times yet.</p>
             ) : (
-              <ul className="space-y-1.5 text-sm">
-                {breast50Board.slice(0, 6).map((row, i) => (
+              <ul className="leaderboard-scroll space-y-1.5 text-sm">
+                {breast50Board.map((row, i) => (
                   <li key={`${row.swimmer_id}-b-${i}`} className="flex justify-between rounded-lg border border-cyan-300/20 bg-slate-900/50 px-2 py-1.5">
                     <span className="text-cyan-200">
                       {i + 1}.{" "}
