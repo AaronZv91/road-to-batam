@@ -147,6 +147,88 @@ export const getSwimmerStrokeHistory = async (stroke, swimmerId, limit = 80) => 
   }));
 };
 
+/**
+ * All 50m times for a stroke, grouped by swimmer with registration timestamp.
+ * Used for Gemini coach outlook (improvement prediction toward Aug 29).
+ */
+export const getStrokeCoachDataset = async (stroke) => {
+  if (stroke !== "freestyle" && stroke !== "breaststroke") return [];
+
+  const { data: swimmers, error: swErr } = await supabase
+    .from("swimmers")
+    .select("id, name, last_active, created_at");
+  if (swErr) {
+    // Some projects may not have created_at on swimmers — fall back.
+    const { data: fallback, error: fbErr } = await supabase.from("swimmers").select("id, name, last_active");
+    if (fbErr) {
+      console.error("getStrokeCoachDataset swimmers:", swErr.message, fbErr.message);
+      return [];
+    }
+    return buildCoachDataset(stroke, fallback || []);
+  }
+  return buildCoachDataset(stroke, swimmers || []);
+};
+
+async function buildCoachDataset(stroke, swimmers) {
+  const { data, error } = await supabase
+    .from("swim_times")
+    .select("swimmer_id, time_sec, created_at")
+    .eq("stroke", stroke)
+    .eq("distance_m", 50)
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("getStrokeCoachDataset times:", error.code, error.message);
+    return [];
+  }
+
+  const byId = new Map();
+  for (const s of swimmers) {
+    byId.set(String(s.id), {
+      swimmer_id: s.id,
+      name: s.name,
+      registered_at: s.created_at || s.last_active || null,
+      times: []
+    });
+  }
+
+  for (const row of data || []) {
+    const key = String(row.swimmer_id);
+    let entry = byId.get(key);
+    if (!entry) {
+      entry = {
+        swimmer_id: row.swimmer_id,
+        name: "Unknown",
+        registered_at: null,
+        times: []
+      };
+      byId.set(key, entry);
+    }
+    entry.times.push({
+      time_sec: Number(row.time_sec),
+      logged_at: row.created_at
+    });
+  }
+
+  return [...byId.values()]
+    .filter((p) => p.times.length > 0)
+    .map((p) => {
+      const secs = p.times.map((t) => t.time_sec);
+      const best = Math.min(...secs);
+      const first = p.times[0];
+      const latest = p.times[p.times.length - 1];
+      return {
+        ...p,
+        best_time_sec: best,
+        first_time_sec: first.time_sec,
+        latest_time_sec: latest.time_sec,
+        first_logged_at: first.logged_at,
+        latest_logged_at: latest.logged_at,
+        session_count: p.times.length
+      };
+    })
+    .sort((a, b) => a.best_time_sec - b.best_time_sec);
+}
+
 /** Recent 50m swims for trending panel. */
 export const getTrendingSwims = async (stroke, limit = 40) => {
   const { data, error } = await supabase

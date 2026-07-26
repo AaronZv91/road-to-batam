@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Waves, UserPlus, X } from "lucide-react";
+import { Waves, UserPlus, X, Sparkles, RefreshCw } from "lucide-react";
 import {
   getMembers,
   addMember,
@@ -8,8 +8,10 @@ import {
   subscribeToTeamRealtime,
   insertSwimTime50,
   getLeaderboard50m,
-  getSwimmerStrokeHistory
+  getSwimmerStrokeHistory,
+  getStrokeCoachDataset
 } from "./lib/storage";
+import { generateStrokeCoachSummary } from "./lib/geminiCoach";
 
 function getDaysToGames() {
   const now = new Date();
@@ -26,6 +28,86 @@ function formatSwimTime(sec) {
   const n = Number(sec);
   if (!Number.isFinite(n) || n <= 0) return "—";
   return `${n.toFixed(2)}s`;
+}
+
+function CoachSummaryBoard({ stroke, title, report, loading, error, onGenerate }) {
+  const label = stroke === "breaststroke" ? "breaststroke" : "freestyle";
+  return (
+    <motion.div className="game-card rounded-2xl p-4" layout>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="battle-subtitle">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} />
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">{title}</h2>
+          </div>
+          <p className="mt-1 text-[11px] normal-case tracking-normal text-slate-400">
+            AI coach outlook for 29 Aug from registered athletes and dated 50m {label} times.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-wait disabled:opacity-60"
+        >
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          {loading ? "Generating…" : report ? "Refresh outlook" : "Generate outlook"}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mb-2 rounded-lg border border-red-400/40 bg-red-950/40 px-3 py-2 text-xs text-red-200">{error}</p>
+      )}
+
+      {!report && !loading && !error && (
+        <p className="text-xs text-slate-400">
+          Generate a professional coach summary predicting each swimmer&apos;s improvement by 29 August.
+        </p>
+      )}
+
+      {loading && !report && (
+        <p className="py-6 text-center text-sm text-cyan-200/80">Analyzing timed sessions with Gemini…</p>
+      )}
+
+      {report && (
+        <div className="space-y-3">
+          {report.overview && (
+            <p className="rounded-lg border border-cyan-300/20 bg-slate-950/50 px-3 py-2 text-sm leading-relaxed text-slate-200">
+              {report.overview}
+            </p>
+          )}
+          <ul className="leaderboard-scroll space-y-2 text-sm">
+            {(report.summaries || []).map((row, i) => (
+              <li
+                key={`${row.name}-${i}`}
+                className="rounded-lg border border-cyan-300/20 bg-slate-900/50 px-3 py-2.5"
+              >
+                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-semibold text-cyan-100">{row.name}</span>
+                  <span className="font-mono text-[11px] text-slate-400">
+                    Best {formatSwimTime(row.current_best_sec)}
+                    {row.projected_aug29_sec != null && Number.isFinite(row.projected_aug29_sec) && (
+                      <>
+                        {" "}
+                        · Aug 29 proj.{" "}
+                        <span className="text-neon">{formatSwimTime(row.projected_aug29_sec)}</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-300">{row.outlook}</p>
+              </li>
+            ))}
+          </ul>
+          {report.generated_at && (
+            <p className="text-[10px] text-slate-500">
+              Generated {new Date(report.generated_at).toLocaleString()}
+            </p>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
 }
 
 function StrokeTrendChart({ points, width = 360, height = 200 }) {
@@ -117,6 +199,12 @@ export default function App() {
   const [chartPoints, setChartPoints] = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
   const [swimLogHint, setSwimLogHint] = useState(null);
+  const [freeCoach, setFreeCoach] = useState(null);
+  const [breastCoach, setBreastCoach] = useState(null);
+  const [freeCoachLoading, setFreeCoachLoading] = useState(false);
+  const [breastCoachLoading, setBreastCoachLoading] = useState(false);
+  const [freeCoachError, setFreeCoachError] = useState(null);
+  const [breastCoachError, setBreastCoachError] = useState(null);
 
   function toUiMember(row) {
     return {
@@ -151,6 +239,40 @@ export default function App() {
       setChartPoints([]);
     } finally {
       setChartLoading(false);
+    }
+  }
+
+  async function generateCoachBoard(stroke) {
+    const isFree = stroke === "freestyle";
+    if (isFree) {
+      setFreeCoachLoading(true);
+      setFreeCoachError(null);
+    } else {
+      setBreastCoachLoading(true);
+      setBreastCoachError(null);
+    }
+    try {
+      const dataset = await getStrokeCoachDataset(stroke);
+      const result = await generateStrokeCoachSummary(stroke, dataset);
+      if (!result.ok) {
+        if (isFree) setFreeCoachError(result.error);
+        else setBreastCoachError(result.error);
+        return;
+      }
+      const report = {
+        overview: result.overview,
+        summaries: result.summaries,
+        generated_at: result.generated_at
+      };
+      if (isFree) setFreeCoach(report);
+      else setBreastCoach(report);
+    } catch (e) {
+      const msg = e?.message || "Failed to generate coach summary.";
+      if (isFree) setFreeCoachError(msg);
+      else setBreastCoachError(msg);
+    } finally {
+      if (isFree) setFreeCoachLoading(false);
+      else setBreastCoachLoading(false);
     }
   }
 
@@ -326,6 +448,25 @@ export default function App() {
               </ul>
             )}
           </motion.div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <CoachSummaryBoard
+            stroke="freestyle"
+            title="Coach Outlook — Freestyle"
+            report={freeCoach}
+            loading={freeCoachLoading}
+            error={freeCoachError}
+            onGenerate={() => generateCoachBoard("freestyle")}
+          />
+          <CoachSummaryBoard
+            stroke="breaststroke"
+            title="Coach Outlook — Breaststroke"
+            report={breastCoach}
+            loading={breastCoachLoading}
+            error={breastCoachError}
+            onGenerate={() => generateCoachBoard("breaststroke")}
+          />
         </section>
 
         <section>
