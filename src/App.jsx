@@ -8,10 +8,9 @@ import {
   subscribeToTeamRealtime,
   insertSwimTime50,
   getLeaderboard50m,
-  getSwimmerStrokeHistory,
-  getStrokeCoachDataset
+  getSwimmerStrokeHistory
 } from "./lib/storage";
-import { generateStrokeCoachSummary } from "./lib/geminiCoach";
+import { fetchCoachOutlook } from "./lib/geminiCoach";
 
 function getDaysToGames() {
   const now = new Date();
@@ -30,8 +29,8 @@ function formatSwimTime(sec) {
   return `${n.toFixed(2)}s`;
 }
 
-function CoachSummaryBoard({ stroke, title, report, loading, error, onGenerate }) {
-  const label = stroke === "breaststroke" ? "breaststroke" : "freestyle";
+function CoachSummaryBoard({ title, report, loading, error, onRefresh }) {
+  const label = title.toLowerCase().includes("breast") ? "breaststroke" : "freestyle";
   return (
     <motion.div className="game-card rounded-2xl p-4" layout>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -46,12 +45,13 @@ function CoachSummaryBoard({ stroke, title, report, loading, error, onGenerate }
         </div>
         <button
           type="button"
-          onClick={onGenerate}
+          onClick={onRefresh}
           disabled={loading}
           className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-wait disabled:opacity-60"
+          aria-label="Refresh coach outlook"
         >
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-          {loading ? "Generating…" : report ? "Refresh outlook" : "Generate outlook"}
+          {loading ? "Loading…" : "Refresh"}
         </button>
       </div>
 
@@ -59,14 +59,12 @@ function CoachSummaryBoard({ stroke, title, report, loading, error, onGenerate }
         <p className="mb-2 rounded-lg border border-red-400/40 bg-red-950/40 px-3 py-2 text-xs text-red-200">{error}</p>
       )}
 
-      {!report && !loading && !error && (
-        <p className="text-xs text-slate-400">
-          Generate a professional coach summary predicting each swimmer&apos;s improvement by 29 August.
-        </p>
+      {loading && !report && (
+        <p className="py-6 text-center text-sm text-cyan-200/80">Loading coach outlook…</p>
       )}
 
-      {loading && !report && (
-        <p className="py-6 text-center text-sm text-cyan-200/80">Analyzing timed sessions with Gemini…</p>
+      {!loading && !report && !error && (
+        <p className="text-xs text-slate-400">No coach outlook available yet.</p>
       )}
 
       {report && (
@@ -242,37 +240,46 @@ export default function App() {
     }
   }
 
-  async function generateCoachBoard(stroke) {
-    const isFree = stroke === "freestyle";
-    if (isFree) {
-      setFreeCoachLoading(true);
-      setFreeCoachError(null);
-    } else {
-      setBreastCoachLoading(true);
-      setBreastCoachError(null);
-    }
+  async function loadCoachBoards() {
+    setFreeCoachLoading(true);
+    setBreastCoachLoading(true);
+    setFreeCoachError(null);
+    setBreastCoachError(null);
     try {
-      const dataset = await getStrokeCoachDataset(stroke);
-      const result = await generateStrokeCoachSummary(stroke, dataset);
+      const result = await fetchCoachOutlook();
       if (!result.ok) {
-        if (isFree) setFreeCoachError(result.error);
-        else setBreastCoachError(result.error);
+        setFreeCoachError(result.error);
+        setBreastCoachError(result.error);
         return;
       }
-      const report = {
-        overview: result.overview,
-        summaries: result.summaries,
-        generated_at: result.generated_at
+      const boards = result.boards || {};
+
+      const applyBoard = (stroke, setReport, setError) => {
+        const board = boards[stroke];
+        if (!board) {
+          setError(`No ${stroke} outlook returned.`);
+          return;
+        }
+        if (!board.ok) {
+          setError(board.error || `Could not build ${stroke} outlook.`);
+          return;
+        }
+        setReport({
+          overview: board.overview,
+          summaries: board.summaries,
+          generated_at: board.generated_at
+        });
       };
-      if (isFree) setFreeCoach(report);
-      else setBreastCoach(report);
+
+      applyBoard("freestyle", setFreeCoach, setFreeCoachError);
+      applyBoard("breaststroke", setBreastCoach, setBreastCoachError);
     } catch (e) {
-      const msg = e?.message || "Failed to generate coach summary.";
-      if (isFree) setFreeCoachError(msg);
-      else setBreastCoachError(msg);
+      const msg = e?.message || "Failed to load coach outlook.";
+      setFreeCoachError(msg);
+      setBreastCoachError(msg);
     } finally {
-      if (isFree) setFreeCoachLoading(false);
-      else setBreastCoachLoading(false);
+      setFreeCoachLoading(false);
+      setBreastCoachLoading(false);
     }
   }
 
@@ -294,6 +301,10 @@ export default function App() {
       .catch((error) => {
         console.error("Failed to load members:", error);
       });
+
+    loadCoachBoards().catch((error) => {
+      console.error("Failed to load coach outlook:", error);
+    });
 
     const channel = subscribeToTeamRealtime(() => {
       refreshMembers()
@@ -452,20 +463,18 @@ export default function App() {
 
         <section className="grid gap-6 lg:grid-cols-2">
           <CoachSummaryBoard
-            stroke="freestyle"
             title="Coach Outlook — Freestyle"
             report={freeCoach}
             loading={freeCoachLoading}
             error={freeCoachError}
-            onGenerate={() => generateCoachBoard("freestyle")}
+            onRefresh={loadCoachBoards}
           />
           <CoachSummaryBoard
-            stroke="breaststroke"
             title="Coach Outlook — Breaststroke"
             report={breastCoach}
             loading={breastCoachLoading}
             error={breastCoachError}
-            onGenerate={() => generateCoachBoard("breaststroke")}
+            onRefresh={loadCoachBoards}
           />
         </section>
 

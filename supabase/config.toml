@@ -1,0 +1,5 @@
+# Supabase local/project config for Edge Functions.
+# Project: vjnxxaramaleqahpvbng
+
+[functions.coach-outlook]
+verify_jwt = false
