@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Waves, Timer, UserPlus, X } from "lucide-react";
+import { Waves, UserPlus, X } from "lucide-react";
 import {
   getMembers,
   addMember,
@@ -263,17 +263,11 @@ export default function App() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="battle-subtitle text-xs uppercase tracking-[0.3em]">Road to Batam</p>
-            <h1 className="battle-title mt-1 text-2xl font-bold md:text-3xl">
-              Mission: Regional Games | August 29th | {days} Days To Go
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl border border-neon/60 bg-neon/10 px-4 py-2 text-neon shadow-green">
-            <Timer size={16} />
-            <span className="text-sm font-semibold">500km Team Target</span>
-          </div>
+        <div>
+          <p className="battle-subtitle text-xs uppercase tracking-[0.3em]">Road to Batam</p>
+          <h1 className="battle-title mt-1 text-2xl font-bold md:text-3xl">
+            Mission: Regional Games | August 29th | {days} Days To Go
+          </h1>
         </div>
       </motion.header>
 
