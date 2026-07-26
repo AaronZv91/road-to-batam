@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Trophy,
-  Waves,
-  Timer,
-  UserPlus,
-  Milestone,
-  Medal,
-  X
-} from "lucide-react";
+import { Waves, Timer, UserPlus, X } from "lucide-react";
 import {
   getMembers,
   addMember,
@@ -18,16 +10,6 @@ import {
   getLeaderboard50m,
   getSwimmerStrokeHistory
 } from "./lib/storage";
-import OSMExpeditionMap from "./components/OSMExpeditionMap";
-
-const GOAL_KM = 500;
-const ACTIVE_WINDOW_MS = 48 * 60 * 60 * 1000;
-const STAGES = [
-  { name: "The First Splash", range: "0-100km", detail: "Eastern Coastline Route", max: 100 },
-  { name: "Cruise Interval", range: "100-250km", detail: "Southern Industrial Route", max: 250 },
-  { name: "The Swell Challenge", range: "250-450km", detail: "Northern Strait Loop", max: 450 },
-  { name: "The Final Sprint", range: "450-500km", detail: "Crossing the Strait to the Batam Finish Line", max: 500 }
-];
 
 function getDaysToGames() {
   const now = new Date();
@@ -36,10 +18,6 @@ function getDaysToGames() {
   const finalTarget = now > target ? new Date(`${year + 1}-08-29T00:00:00`) : target;
   const diff = finalTarget.getTime() - now.getTime();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
-
-function getStage(km) {
-  return STAGES.find((stage) => km <= stage.max) ?? STAGES[STAGES.length - 1];
 }
 
 const MISSION_MAX_M = 500000;
@@ -124,52 +102,6 @@ function StrokeTrendChart({ points, width = 360, height = 200 }) {
   );
 }
 
-function TeamCircle({ swimmers }) {
-  const radius = swimmers.length > 16 ? 160 : 130;
-  return (
-    <div className="relative mx-auto h-[360px] w-full max-w-[360px]">
-      <div className="absolute inset-0 m-auto h-40 w-40 rounded-full border-2 border-cyan-500/40 bg-cyan-950/30 blur-[1px]" />
-      <motion.div
-        className="absolute inset-0 m-auto flex h-40 w-40 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-slate-900/80 shadow-glow"
-        animate={{ scale: [1, 1.02, 1] }}
-        transition={{ repeat: Infinity, duration: 2.5 }}
-      >
-        <div className="text-center">
-          <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/80">Team Core</p>
-          <p className="mt-1 text-2xl font-bold text-cyan-100">{swimmers.length}</p>
-        </div>
-      </motion.div>
-      {swimmers.map((swimmer, i) => {
-        const angle = (i / swimmers.length) * Math.PI * 2 - Math.PI / 2;
-        const x = Math.cos(angle) * radius + 180;
-        const y = Math.sin(angle) * radius + 180;
-        const isActive = Date.now() - swimmer.lastLoggedAt <= ACTIVE_WINDOW_MS;
-        return (
-          <motion.div
-            key={swimmer.id}
-            className="absolute"
-            animate={{ x: x - 14, y: y - 14 }}
-            transition={{ type: "spring", stiffness: 120, damping: 16 }}
-          >
-            <motion.div
-              className={`flex h-9 w-9 items-center justify-center rounded-full border-2 ${
-                isActive
-                  ? "border-cyan-100 bg-electric text-white shadow-glow"
-                  : "border-slate-400 bg-slate-600 text-slate-200"
-              }`}
-              animate={isActive ? { scale: [1, 1.15, 1], opacity: [1, 0.85, 1] } : {}}
-              transition={isActive ? { repeat: Infinity, duration: 1.8 } : {}}
-              title={`${swimmer.name} · ${swimmer.totalKm.toFixed(2)}km`}
-            >
-              <span className="text-[10px] font-bold">{swimmer.name.slice(0, 1)}</span>
-            </motion.div>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function App() {
   const [state, setState] = useState({ team: [], logs: [] });
   const [selectedId, setSelectedId] = useState("");
@@ -178,7 +110,6 @@ export default function App() {
   const [stroke, setStroke] = useState("freestyle");
   const [timeSec, setTimeSec] = useState("");
   const [splashKey, setSplashKey] = useState(0);
-  const [podBoost, setPodBoost] = useState(0);
   const [days, setDays] = useState(() => getDaysToGames());
   const [free50Board, setFree50Board] = useState([]);
   const [breast50Board, setBreast50Board] = useState([]);
@@ -262,14 +193,9 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const sorted = useMemo(
-    () => [...state.team].sort((a, b) => b.totalKm - a.totalKm),
-    [state.team]
-  );
   const totalKm = useMemo(() => state.team.reduce((acc, n) => acc + n.totalKm, 0), [state.team]);
   const currentMeters = Math.round(totalKm * 1000);
   const barPct = Math.min((currentMeters / MISSION_MAX_M) * 100, 100);
-  const activeStage = getStage(totalKm);
 
   async function handleLogSwim(e) {
     e.preventDefault();
@@ -315,7 +241,6 @@ export default function App() {
     if (hasTime && timeInsertOk) setTimeSec("");
     if (hasDistance || (hasTime && timeInsertOk)) {
       setSplashKey((k) => k + 1);
-      setPodBoost((k) => k + 1);
     }
   }
 
@@ -330,12 +255,6 @@ export default function App() {
     if (created) setSelectedId(created.id);
     setJoinName("");
   }
-
-  const badgeThemes = [
-    "border-amber-300 bg-amber-500/20 text-amber-100",
-    "border-slate-300 bg-slate-400/20 text-slate-100",
-    "border-orange-400 bg-orange-500/20 text-orange-100"
-  ];
 
   return (
     <div className="min-h-screen px-4 py-6 md:px-8">
@@ -358,15 +277,64 @@ export default function App() {
         </div>
       </motion.header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.2fr_1fr]">
-        <section className="space-y-6">
-          <OSMExpeditionMap
-            progressKm={totalKm}
-            goalKm={GOAL_KM}
-            stageLabel={`${activeStage.name} · ${activeStage.detail}`}
-            boostSignal={podBoost}
-          />
+      <main className="mx-auto max-w-6xl space-y-6">
+        <section className="grid gap-6 lg:grid-cols-2">
+          <motion.div className="game-card rounded-2xl p-4" layout>
+            <div className="battle-subtitle mb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Fastest Freestyle (50m)</h2>
+            </div>
+            {free50Board.length === 0 ? (
+              <p className="text-xs text-slate-400">No 50m freestyle times yet.</p>
+            ) : (
+              <ul className="leaderboard-scroll space-y-1.5 text-sm">
+                {free50Board.map((row, i) => (
+                  <li key={`${row.swimmer_id}-${i}`} className="flex justify-between rounded-lg border border-cyan-300/20 bg-slate-900/50 px-2 py-1.5">
+                    <span className="text-cyan-200">
+                      {i + 1}.{" "}
+                      <button
+                        type="button"
+                        className="font-medium text-cyan-100 underline decoration-cyan-500/60 decoration-2 underline-offset-2 hover:text-white"
+                        onClick={() => openSwimmerChart("freestyle", row.swimmer_id, row.name)}
+                      >
+                        {row.name}
+                      </button>
+                    </span>
+                    <span className="font-mono font-semibold text-neon">{formatSwimTime(row.time_sec)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </motion.div>
 
+          <motion.div className="game-card rounded-2xl p-4" layout>
+            <div className="battle-subtitle mb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Fastest Breaststroke (50m)</h2>
+            </div>
+            {breast50Board.length === 0 ? (
+              <p className="text-xs text-slate-400">No 50m breaststroke times yet.</p>
+            ) : (
+              <ul className="leaderboard-scroll space-y-1.5 text-sm">
+                {breast50Board.map((row, i) => (
+                  <li key={`${row.swimmer_id}-b-${i}`} className="flex justify-between rounded-lg border border-cyan-300/20 bg-slate-900/50 px-2 py-1.5">
+                    <span className="text-cyan-200">
+                      {i + 1}.{" "}
+                      <button
+                        type="button"
+                        className="font-medium text-cyan-100 underline decoration-cyan-500/60 decoration-2 underline-offset-2 hover:text-white"
+                        onClick={() => openSwimmerChart("breaststroke", row.swimmer_id, row.name)}
+                      >
+                        {row.name}
+                      </button>
+                    </span>
+                    <span className="font-mono font-semibold text-neon">{formatSwimTime(row.time_sec)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </motion.div>
+        </section>
+
+        <section>
           <motion.div className="game-card rounded-2xl p-4" layout>
             <div className="battle-subtitle mb-4 flex items-center gap-2">
               <Waves size={18} />
@@ -505,115 +473,6 @@ export default function App() {
                 style={{ left: `${barPct}%` }}
               />
             </div>
-          </motion.div>
-        </section>
-
-        <section className="space-y-6">
-          <motion.div className="game-card relative overflow-hidden rounded-2xl p-4" layout>
-            <motion.div
-              className="pointer-events-none absolute left-1/2 top-1/2 h-52 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/30"
-              animate={{ scale: [0.92, 1.08, 0.92], opacity: [0.25, 0.45, 0.25] }}
-              transition={{ repeat: Infinity, duration: 1.8 }}
-            />
-            <motion.div
-              className="pointer-events-none absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-sky-300/40"
-              animate={{ scale: [0.95, 1.12, 0.95], opacity: [0.25, 0.45, 0.25] }}
-              transition={{ repeat: Infinity, duration: 2.3 }}
-            />
-            <div className="battle-subtitle relative mb-2 flex items-center gap-2">
-              <Milestone size={18} />
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Team Core Dynamics</h2>
-            </div>
-            <div className="relative">
-              <TeamCircle swimmers={state.team} />
-            </div>
-            <p className="battle-subtitle text-center text-xs">
-              Electric Blue pulse = logged within last 48 hours
-            </p>
-          </motion.div>
-
-          <motion.div className="game-card rounded-2xl p-4" layout>
-            <div className="battle-subtitle mb-3 flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <Trophy size={18} />
-                <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Lead Shark</h2>
-              </div>
-            </div>
-            <div className="leaderboard-scroll space-y-2">
-              {sorted.map((swimmer, idx) => (
-                <div
-                  key={swimmer.id}
-                  className="flex items-center justify-between rounded-xl border border-cyan-300/30 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-cyan-300">{idx + 1}</span>
-                    <span className="font-medium">{swimmer.name}</span>
-                    {idx < 3 && (
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-lg border-2 px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${badgeThemes[idx]}`}
-                      >
-                        <Medal size={11} /> Lead Shark
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-semibold text-neon">{swimmer.totalKm.toFixed(2)} km</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-
-          <motion.div className="game-card rounded-2xl p-4" layout>
-            <div className="battle-subtitle mb-2">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Fastest Freestyle (50m)</h2>
-            </div>
-            {free50Board.length === 0 ? (
-              <p className="text-xs text-slate-400">No 50m freestyle times yet.</p>
-            ) : (
-              <ul className="leaderboard-scroll space-y-1.5 text-sm">
-                {free50Board.map((row, i) => (
-                  <li key={`${row.swimmer_id}-${i}`} className="flex justify-between rounded-lg border border-cyan-300/20 bg-slate-900/50 px-2 py-1.5">
-                    <span className="text-cyan-200">
-                      {i + 1}.{" "}
-                      <button
-                        type="button"
-                        className="font-medium text-cyan-100 underline decoration-cyan-500/60 decoration-2 underline-offset-2 hover:text-white"
-                        onClick={() => openSwimmerChart("freestyle", row.swimmer_id, row.name)}
-                      >
-                        {row.name}
-                      </button>
-                    </span>
-                    <span className="font-mono font-semibold text-neon">{formatSwimTime(row.time_sec)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </motion.div>
-
-          <motion.div className="game-card rounded-2xl p-4" layout>
-            <div className="battle-subtitle mb-2">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">Fastest Breaststroke (50m)</h2>
-            </div>
-            {breast50Board.length === 0 ? (
-              <p className="text-xs text-slate-400">No 50m breaststroke times yet.</p>
-            ) : (
-              <ul className="leaderboard-scroll space-y-1.5 text-sm">
-                {breast50Board.map((row, i) => (
-                  <li key={`${row.swimmer_id}-b-${i}`} className="flex justify-between rounded-lg border border-cyan-300/20 bg-slate-900/50 px-2 py-1.5">
-                    <span className="text-cyan-200">
-                      {i + 1}.{" "}
-                      <button
-                        type="button"
-                        className="font-medium text-cyan-100 underline decoration-cyan-500/60 decoration-2 underline-offset-2 hover:text-white"
-                        onClick={() => openSwimmerChart("breaststroke", row.swimmer_id, row.name)}
-                      >
-                        {row.name}
-                      </button>
-                    </span>
-                    <span className="font-mono font-semibold text-neon">{formatSwimTime(row.time_sec)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
           </motion.div>
         </section>
       </main>
