@@ -162,22 +162,18 @@ async function callGemini(apiKey: string, stroke: string, players: Awaited<Retur
   }
 
   const payload = buildPayload(stroke, players);
-  const prompt = `You are a strict, high-standard competitive swimming coach writing blunt athlete reviews for a corporate swim club preparing for the ${TARGET_EVENT} ${eventYear()}. Speak like a serious race coach: direct, demanding, and unsentimental. No encouragement fluff, no soft praise, no slang, no emojis, no hype.
+  const prompt = `You are an experienced competitive swimming coach writing brief, professional athlete reviews for a corporate swim club preparing for the ${TARGET_EVENT} ${eventYear()}.
 
 Stroke focus: 50m ${payload.stroke}.
 
 Using each athlete's registration timestamp and their dated 50m timed sessions (grouped below), produce:
-1) A short team overview (2–3 sentences) on overall ${payload.stroke} readiness for 29 August. Call out weak attendance, plateaued times, and insufficient race preparedness where the data supports it.
-2) One coach note per athlete: assess trajectory from their timed history, then give a realistic improvement outlook / predicted race readiness for 29 August. Hold athletes accountable for inconsistent logging, slow progress, or stagnant bests. State what must improve before 29 August.
+1) A short team overview (2–3 sentences) on overall ${payload.stroke} readiness for 29 August.
+2) One coach note per athlete: assess trajectory from their timed history, then give a realistic improvement outlook / predicted race readiness for 29 August.
 
-Tone rules:
-- Strict coach voice: firm, precise, and professional.
-- Do not cushion criticism. If the data is weak, say so plainly.
-- Credit real improvement only when times clearly show it — briefly, then raise the standard.
-- Never invent excuses for the athlete.
+Tone: professional coach — clear, constructive, balanced, and specific. Acknowledge progress when the data shows it; note gaps calmly when it does not. No slang, no emojis, no hype.
 
-Data rules:
-- Base conclusions only on the provided times and dates. If data is sparse (1–2 swims), say the evidence is insufficient and keep the prediction cautious.
+Rules:
+- Base conclusions only on the provided times and dates. If data is sparse (1–2 swims), say so and keep the prediction cautious.
 - Prefer specific seconds when predicting (e.g. "projected best around 34.5–35.0s").
 - Do not invent sessions that are not in the data.
 - Cover every athlete in the list.
@@ -192,7 +188,7 @@ Return ONLY valid JSON with this shape:
       "name": "exact athlete name",
       "current_best_sec": number,
       "projected_aug29_sec": number or null,
-      "outlook": "1–2 sentence strict coach summary"
+      "outlook": "1–2 sentence professional coach summary"
     }
   ]
 }
@@ -207,7 +203,7 @@ ${JSON.stringify(payload)}`;
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.35,
         maxOutputTokens: 8192,
         responseMimeType: "application/json"
       }
