@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Waves, UserPlus, X, Sparkles, RefreshCw } from "lucide-react";
 import {
@@ -20,8 +20,6 @@ function getDaysToGames() {
   const diff = finalTarget.getTime() - now.getTime();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
-
-const MISSION_MAX_M = 500000;
 
 function formatSwimTime(sec) {
   const n = Number(sec);
@@ -189,7 +187,6 @@ export default function App() {
   const [joinName, setJoinName] = useState("");
   const [stroke, setStroke] = useState("freestyle");
   const [timeSec, setTimeSec] = useState("");
-  const [splashKey, setSplashKey] = useState(0);
   const [days, setDays] = useState(() => getDaysToGames());
   const [free50Board, setFree50Board] = useState([]);
   const [breast50Board, setBreast50Board] = useState([]);
@@ -326,10 +323,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const totalKm = useMemo(() => state.team.reduce((acc, n) => acc + n.totalKm, 0), [state.team]);
-  const currentMeters = Math.round(totalKm * 1000);
-  const barPct = Math.min((currentMeters / MISSION_MAX_M) * 100, 100);
-
   async function handleLogSwim(e) {
     e.preventDefault();
     if (!selectedId) return;
@@ -372,9 +365,6 @@ export default function App() {
 
     if (hasDistance) setMeters("");
     if (hasTime && timeInsertOk) setTimeSec("");
-    if (hasDistance || (hasTime && timeInsertOk)) {
-      setSplashKey((k) => k + 1);
-    }
   }
 
   async function joinMission() {
@@ -595,27 +585,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </div>
-            <div className="mt-5 flex items-center justify-between text-[11px] text-cyan-200/80">
-              <span>0m</span>
-              <span>{MISSION_MAX_M.toLocaleString()}m</span>
-            </div>
-            <p className="mt-2 text-center text-sm font-semibold text-cyan-200">
-              Current: {currentMeters.toLocaleString()} m
-            </p>
-            <div className="relative mt-1 h-4 w-full">
-              <div className="absolute inset-0 rounded-full bg-slate-800" />
-              <motion.div
-                key={splashKey}
-                className="absolute left-0 top-0 h-4 rounded-full bg-neon shadow-[0_0_12px_rgba(34,197,94,0.45)]"
-                initial={{ width: 0 }}
-                animate={{ width: `${barPct}%` }}
-                transition={{ type: "spring", stiffness: 120, damping: 18 }}
-              />
-              <div
-                className="pointer-events-none absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-300 shadow-[0_0_14px_#22d3ee,0_0_8px_#a5f3fc]"
-                style={{ left: `${barPct}%` }}
-              />
             </div>
           </motion.div>
         </section>
