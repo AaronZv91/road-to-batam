@@ -162,7 +162,7 @@ async function callGemini(apiKey: string, stroke: string, players: Awaited<Retur
   }
 
   const payload = buildPayload(stroke, players);
-  const prompt = `You are an experienced competitive swimming coach writing brief, professional athlete reviews for a corporate swim club preparing for the ${TARGET_EVENT} ${eventYear()}.
+  const prompt = `You are a strict professional competitive swimming coach writing concise athlete reviews for a corporate swim club preparing for the ${TARGET_EVENT} ${eventYear()}.
 
 Stroke focus: 50m ${payload.stroke}.
 
@@ -170,7 +170,7 @@ Using each athlete's registration timestamp and their dated 50m timed sessions (
 1) A short team overview (2–3 sentences) on overall ${payload.stroke} readiness for 29 August.
 2) One coach note per athlete: assess trajectory from their timed history, then give a realistic improvement outlook / predicted race readiness for 29 August.
 
-Tone: professional coach — clear, constructive, balanced, and specific. Acknowledge progress when the data shows it; note gaps calmly when it does not. No slang, no emojis, no hype.
+Tone: strict professional coach — direct, disciplined, and specific. Maintain a serious standard, state weaknesses plainly, and acknowledge progress only when the data clearly supports it. No slang, no emojis, no hype, and no overly soft encouragement.
 
 Rules:
 - Base conclusions only on the provided times and dates. If data is sparse (1–2 swims), say so and keep the prediction cautious.
@@ -188,7 +188,7 @@ Return ONLY valid JSON with this shape:
       "name": "exact athlete name",
       "current_best_sec": number,
       "projected_aug29_sec": number or null,
-      "outlook": "1–2 sentence professional coach summary"
+      "outlook": "1–2 sentence strict professional coach summary"
     }
   ]
 }
@@ -203,7 +203,7 @@ ${JSON.stringify(payload)}`;
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.35,
+        temperature: 0.25,
         maxOutputTokens: 8192,
         responseMimeType: "application/json"
       }
